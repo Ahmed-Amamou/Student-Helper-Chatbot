@@ -33,7 +33,7 @@ SYSTEM_PROMPT = """You are a helpful study assistant for engineering students. U
 If the context doesn't cover the question, say so honestly rather than guessing. Be clear, concise, and educational in your responses."""
 
 
-def _retrieve_context(query: str, top_k: int = 5) -> list[dict]:
+def _retrieve_context(query: str, top_k: int = 3) -> list[dict]:
     """Embed query and retrieve relevant chunks from Pinecone."""
     query_embedding = embed_query(query)
     index = _get_pinecone_index()
@@ -41,7 +41,7 @@ def _retrieve_context(query: str, top_k: int = 5) -> list[dict]:
 
     sources = []
     for match in results.matches:
-        if match.score >= 0.7:
+        if match.score >= 0.3:
             sources.append({
                 "doc_id": match.metadata.get("doc_id", ""),
                 "doc_title": match.metadata.get("doc_title", ""),
