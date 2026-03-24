@@ -1,7 +1,7 @@
 import json
 from collections.abc import AsyncGenerator
 
-import anthropic
+from openai import AsyncOpenAI
 from pinecone import Pinecone
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +11,7 @@ from app.models.message import Message
 from app.services.embedding_service import embed_query
 
 _pinecone: Pinecone | None = None
-_anthropic: anthropic.AsyncAnthropic | None = None
+_openai: AsyncOpenAI | None = None
 
 
 def _get_pinecone_index():
@@ -21,11 +21,11 @@ def _get_pinecone_index():
     return _pinecone.Index(settings.PINECONE_INDEX_NAME)
 
 
-def _get_anthropic():
-    global _anthropic
-    if _anthropic is None:
-        _anthropic = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-    return _anthropic
+def _get_openai():
+    global _openai
+    if _openai is None:
+        _openai = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    return _openai
 
 
 SYSTEM_PROMPT = """You are a helpful study assistant for engineering students. Use the provided context from course materials to answer questions accurately. Always cite which document your information comes from when possible.
@@ -52,8 +52,8 @@ def _retrieve_context(query: str, top_k: int = 5) -> list[dict]:
 
 
 def _build_messages(chat: Chat, new_content: str, context_chunks: list[dict]) -> list[dict]:
-    """Build the message list for Claude API."""
-    messages = []
+    """Build the message list for OpenAI API."""
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     # Add last 10 messages from history
     for msg in chat.messages[-10:]:
@@ -84,20 +84,22 @@ async def stream_rag_response(
     db.add(user_msg)
     await db.commit()
 
-    # 3. Build prompt and stream Claude response
+    # 3. Build prompt and stream OpenAI response
     messages = _build_messages(chat, content, sources)
-    client = _get_anthropic()
+    client = _get_openai()
 
     full_response = ""
-    async with client.messages.stream(
-        model="claude-sonnet-4-20250514",
+    stream = await client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,  # type: ignore[arg-type]
+        stream=True,
         max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        messages=messages,
-    ) as stream:
-        async for text in stream.text_stream:
-            full_response += text
-            yield json.dumps({"type": "text", "content": text})
+    )
+    async for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            full_response += delta
+            yield json.dumps({"type": "text", "content": delta})
 
     # 4. Save assistant message with sources
     assistant_msg = Message(
@@ -118,12 +120,13 @@ async def stream_rag_response(
 
 async def generate_chat_title(content: str) -> str:
     """Generate a short title for a chat based on the first message."""
-    client = _get_anthropic()
-    response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    client = _get_openai()
+    response = await client.chat.completions.create(
+        model="gpt-4o-mini",
         max_tokens=20,
         messages=[
-            {"role": "user", "content": f"Summarize this question in 4-5 words as a chat title. Return ONLY the title, nothing else.\n\n{content}"}
+            {"role": "system", "content": "You generate short chat titles."},
+            {"role": "user", "content": f"Summarize this question in 4-5 words as a chat title. Return ONLY the title, nothing else.\n\n{content}"},
         ],
     )
-    return response.content[0].text.strip()
+    return response.choices[0].message.content.strip()

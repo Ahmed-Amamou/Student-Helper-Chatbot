@@ -15,7 +15,7 @@ def _get_client() -> voyageai.Client:
 def embed_texts(texts: list[str], input_type: str = "document") -> list[list[float]]:
     """Embed a list of texts using Voyage AI. input_type is 'document' or 'query'."""
     client = _get_client()
-    result = client.embed(texts, model="voyage-3-lite", input_type=input_type)
+    result = client.embed(texts, model="voyage-4", input_type=input_type)
     return result.embeddings
 
 

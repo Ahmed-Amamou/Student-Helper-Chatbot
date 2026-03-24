@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./student_helper.db"
-    ANTHROPIC_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
     VOYAGE_API_KEY: str = ""
     PINECONE_API_KEY: str = ""
     PINECONE_INDEX_NAME: str = "student-helper"

@@ -51,7 +51,7 @@ export function useChatDetail(chatId: string | undefined) {
 export function useCreateChat() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (title?: string) => {
+    mutationFn: async (title: string | void) => {
       const { data } = await api.post("/chats/", { title: title || "New Chat" });
       return data as Chat;
     },
