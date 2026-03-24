@@ -1,19 +1,29 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Upload } from "lucide-react";
-import { useUploadDocument } from "@/hooks/use-documents";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useUploadDocument, type DocumentMeta } from "@/hooks/use-documents";
+
+const DOC_TYPES = ["cours", "td", "tp", "exam", "emploi", "other"];
+const SEMESTERS = ["S1", "S2", "S3", "S4", "S5", "S6"];
 
 export function DocumentUploader() {
   const upload = useUploadDocument();
+  const [files, setFiles] = useState<File[]>([]);
+  const [meta, setMeta] = useState<DocumentMeta>({});
 
-  const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      for (const file of acceptedFiles) {
-        upload.mutate(file);
-      }
-    },
-    [upload]
-  );
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    setFiles((prev) => [...prev, ...acceptedFiles]);
+  }, []);
+
+  const handleUpload = () => {
+    for (const file of files) {
+      upload.mutate({ file, meta });
+    }
+    setFiles([]);
+    setMeta({});
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -27,29 +37,126 @@ export function DocumentUploader() {
   });
 
   return (
-    <div
-      {...getRootProps()}
-      className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-        isDragActive
-          ? "border-primary bg-primary/5"
-          : "border-border hover:border-muted-foreground"
-      }`}
-    >
-      <input {...getInputProps()} />
-      <Upload className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
-      {upload.isPending ? (
-        <p className="text-sm text-muted-foreground">Uploading...</p>
-      ) : isDragActive ? (
-        <p className="text-sm text-primary">Drop files here</p>
-      ) : (
-        <>
-          <p className="text-sm text-foreground font-medium">
-            Drag & drop files here
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            PDF, DOCX, PPTX, TXT, MD
-          </p>
-        </>
+    <div className="space-y-4">
+      {/* Dropzone */}
+      <div
+        {...getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+          isDragActive
+            ? "border-primary bg-primary/5"
+            : "border-border hover:border-muted-foreground"
+        }`}
+      >
+        <input {...getInputProps()} />
+        <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+        {isDragActive ? (
+          <p className="text-sm text-primary">Drop files here</p>
+        ) : (
+          <>
+            <p className="text-sm text-foreground font-medium">
+              Drag & drop files here
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              PDF, DOCX, PPTX, TXT, MD
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* Queued files */}
+      {files.length > 0 && (
+        <div className="text-sm text-muted-foreground">
+          {files.length} file{files.length > 1 ? "s" : ""} selected:{" "}
+          {files.map((f) => f.name).join(", ")}
+        </div>
+      )}
+
+      {/* Metadata fields */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">
+            Subject
+          </label>
+          <Input
+            placeholder="e.g. Analyse Numérique"
+            value={meta.subject || ""}
+            onChange={(e) => setMeta({ ...meta, subject: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">
+            Class
+          </label>
+          <Input
+            placeholder="e.g. 1Génie Info A"
+            value={meta.class_name || ""}
+            onChange={(e) => setMeta({ ...meta, class_name: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">
+            Semester
+          </label>
+          <select
+            value={meta.semester || ""}
+            onChange={(e) => setMeta({ ...meta, semester: e.target.value })}
+            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="">Select semester</option>
+            {SEMESTERS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">
+            Academic Year
+          </label>
+          <Input
+            placeholder="e.g. 2023-2024"
+            value={meta.academic_year || ""}
+            onChange={(e) =>
+              setMeta({ ...meta, academic_year: e.target.value })
+            }
+          />
+        </div>
+        <div className="col-span-2 space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">
+            Document Type
+          </label>
+          <div className="flex gap-2 flex-wrap">
+            {DOC_TYPES.map((t) => (
+              <button
+                key={t}
+                onClick={() =>
+                  setMeta({ ...meta, doc_type: meta.doc_type === t ? "" : t })
+                }
+                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors capitalize ${
+                  meta.doc_type === t
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Upload button */}
+      {files.length > 0 && (
+        <Button
+          onClick={handleUpload}
+          disabled={upload.isPending}
+          className="w-full"
+        >
+          {upload.isPending
+            ? "Uploading..."
+            : `Upload ${files.length} file${files.length > 1 ? "s" : ""}`}
+        </Button>
       )}
     </div>
   );

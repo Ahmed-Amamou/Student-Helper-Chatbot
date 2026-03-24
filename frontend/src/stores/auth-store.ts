@@ -1,13 +1,16 @@
 import { create } from "zustand";
 import api from "@/lib/api";
 
-interface User {
+export interface User {
   id: string;
   email: string;
   full_name: string;
   role: string;
   auth_provider: string;
   avatar_url: string | null;
+  class_name: string | null;
+  semester: string | null;
+  year: string | null;
 }
 
 interface AuthState {
@@ -17,6 +20,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName: string) => Promise<void>;
   googleAuth: (token: string) => Promise<void>;
+  updateProfile: (data: Partial<Pick<User, "full_name" | "class_name" | "semester" | "year">>) => Promise<void>;
   logout: () => void;
   fetchUser: () => Promise<void>;
 }
@@ -52,6 +56,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem("refresh_token", data.refresh_token);
     const { data: user } = await api.get("/auth/me");
     set({ user, isAuthenticated: true });
+  },
+
+  updateProfile: async (data) => {
+    const { data: user } = await api.patch("/auth/me", data);
+    set({ user });
   },
 
   logout: () => {

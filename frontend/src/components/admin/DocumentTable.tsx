@@ -35,8 +35,10 @@ export function DocumentTable() {
         <thead>
           <tr className="border-b border-border bg-muted/50">
             <th className="text-left px-4 py-3 font-medium">Document</th>
+            <th className="text-left px-4 py-3 font-medium">Subject</th>
+            <th className="text-left px-4 py-3 font-medium">Class</th>
+            <th className="text-left px-4 py-3 font-medium">Sem</th>
             <th className="text-left px-4 py-3 font-medium">Type</th>
-            <th className="text-left px-4 py-3 font-medium">Size</th>
             <th className="text-left px-4 py-3 font-medium">Chunks</th>
             <th className="text-left px-4 py-3 font-medium">Status</th>
             <th className="text-left px-4 py-3 font-medium">Uploaded</th>
@@ -48,15 +50,34 @@ export function DocumentTable() {
             <tr key={doc.id} className="border-b border-border last:border-0">
               <td className="px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
-                  <span className="truncate max-w-[200px]">{doc.title}</span>
+                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div>
+                    <span className="truncate block max-w-[180px]">
+                      {doc.title}
+                    </span>
+                    <span className="text-xs text-muted-foreground uppercase">
+                      {doc.file_type} &middot; {formatSize(doc.file_size)}
+                    </span>
+                  </div>
                 </div>
               </td>
-              <td className="px-4 py-3 text-muted-foreground uppercase">
-                {doc.file_type}
+              <td className="px-4 py-3 text-muted-foreground">
+                {doc.subject || "—"}
               </td>
               <td className="px-4 py-3 text-muted-foreground">
-                {formatSize(doc.file_size)}
+                {doc.class_name || "—"}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground">
+                {doc.semester || "—"}
+              </td>
+              <td className="px-4 py-3">
+                {doc.doc_type ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary capitalize">
+                    {doc.doc_type}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </td>
               <td className="px-4 py-3 text-muted-foreground">
                 {doc.chunk_count}
