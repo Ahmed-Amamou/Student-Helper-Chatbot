@@ -1,6 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.formparsers import MultiPartParser
 
 from app.core.exceptions import BadRequestException, NotFoundException
 from app.database import get_db
@@ -9,6 +10,9 @@ from app.models.document import Document
 from app.models.user import User
 from app.schemas.document import DocumentResponse
 from app.services.document_service import delete_document_vectors, process_document
+
+# Raise the default 1MB multipart limit to 50MB
+MultiPartParser.max_file_size = 50 * 1024 * 1024
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
