@@ -30,7 +30,7 @@ async def send_message(
             pass
 
     async def event_generator():
-        async for chunk in rag_service.stream_rag_response(db, chat, req.content):
+        async for chunk in rag_service.stream_rag_response(db, chat, current_user, req.content):
             yield {"data": chunk}
 
     return EventSourceResponse(event_generator())

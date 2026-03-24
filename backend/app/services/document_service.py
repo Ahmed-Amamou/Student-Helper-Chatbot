@@ -19,6 +19,24 @@ PARSERS = {
 }
 
 
+def _build_metadata_prefix(document: Document) -> str:
+    """Build a descriptive prefix from document metadata to prepend to each chunk.
+    This ensures the embedding vector captures the document's context."""
+    parts = []
+    if document.subject:
+        parts.append(f"Subject: {document.subject}")
+    if document.class_name:
+        parts.append(f"Class: {document.class_name}")
+    if document.semester:
+        parts.append(f"Semester: {document.semester}")
+    if document.academic_year:
+        parts.append(f"Year: {document.academic_year}")
+    if document.doc_type:
+        parts.append(f"Type: {document.doc_type}")
+    parts.append(f"Document: {document.title}")
+    return " | ".join(parts)
+
+
 async def process_document(db: AsyncSession, document: Document, file_bytes: bytes) -> None:
     """Parse, chunk, embed, and store document vectors in Pinecone."""
     try:
@@ -38,35 +56,52 @@ async def process_document(db: AsyncSession, document: Document, file_bytes: byt
         # 2. Chunk
         chunks = chunk_text(text)
 
-        # 3. Embed in batches of 128
+        # 3. Prepend metadata context to each chunk for richer embeddings
+        metadata_prefix = _build_metadata_prefix(document)
+        enriched_chunks = [f"{metadata_prefix}\n\n{chunk}" for chunk in chunks]
+
+        # 4. Embed in batches of 128
         all_embeddings = []
-        for i in range(0, len(chunks), 128):
-            batch = chunks[i : i + 128]
+        for i in range(0, len(enriched_chunks), 128):
+            batch = enriched_chunks[i : i + 128]
             embeddings = embed_texts(batch, input_type="document")
             all_embeddings.extend(embeddings)
 
-        # 4. Upsert to Pinecone in batches of 100
+        # 5. Upsert to Pinecone in batches of 100
         pc = Pinecone(api_key=settings.PINECONE_API_KEY)
         index = pc.Index(settings.PINECONE_INDEX_NAME)
 
         vectors = []
         for i, (chunk, embedding) in enumerate(zip(chunks, all_embeddings)):
+            metadata = {
+                "doc_id": document.id,
+                "doc_title": document.title,
+                "chunk_index": i,
+                "text": chunk[:1000],
+            }
+            # Add structured metadata for Pinecone filtering
+            if document.subject:
+                metadata["subject"] = document.subject
+            if document.class_name:
+                metadata["class_name"] = document.class_name
+            if document.semester:
+                metadata["semester"] = document.semester
+            if document.academic_year:
+                metadata["academic_year"] = document.academic_year
+            if document.doc_type:
+                metadata["doc_type"] = document.doc_type
+
             vectors.append({
                 "id": f"{document.id}#{i}",
                 "values": embedding,
-                "metadata": {
-                    "doc_id": document.id,
-                    "doc_title": document.title,
-                    "chunk_index": i,
-                    "text": chunk[:1000],  # Pinecone metadata limit
-                },
+                "metadata": metadata,
             })
 
         for i in range(0, len(vectors), 100):
             batch = vectors[i : i + 100]
             index.upsert(vectors=batch)
 
-        # 5. Update document record
+        # 6. Update document record
         document.chunk_count = len(chunks)
         document.status = "ready"
         await db.commit()
@@ -80,10 +115,7 @@ async def delete_document_vectors(doc_id: str) -> None:
     """Delete all vectors for a document from Pinecone."""
     pc = Pinecone(api_key=settings.PINECONE_API_KEY)
     index = pc.Index(settings.PINECONE_INDEX_NAME)
-    # Delete by ID prefix
-    # Pinecone supports delete by filter on some plans; use list+delete as fallback
     try:
         index.delete(filter={"doc_id": {"$eq": doc_id}})
     except Exception:
-        # Fallback: list and delete by IDs
         pass

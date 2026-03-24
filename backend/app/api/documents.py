@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.formparsers import MultiPartParser
@@ -34,6 +34,11 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
+    subject: str = Form(default=""),
+    class_name: str = Form(default=""),
+    semester: str = Form(default=""),
+    academic_year: str = Form(default=""),
+    doc_type: str = Form(default=""),
 ):
     if not file.filename:
         raise BadRequestException("No file provided")
@@ -51,6 +56,11 @@ async def upload_document(
         file_type=ext,
         file_size=len(file_bytes),
         uploaded_by=admin.id,
+        subject=subject or None,
+        class_name=class_name or None,
+        semester=semester or None,
+        academic_year=academic_year or None,
+        doc_type=doc_type or None,
     )
     db.add(doc)
     await db.commit()

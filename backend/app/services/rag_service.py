@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.chat import Chat
 from app.models.message import Message
+from app.models.user import User
 from app.services.embedding_service import embed_query
 
 _pinecone: Pinecone | None = None
@@ -28,32 +29,88 @@ def _get_openai():
     return _openai
 
 
-SYSTEM_PROMPT = """You are a helpful study assistant for engineering students. Use the provided context from course materials to answer questions accurately. Always cite which document your information comes from when possible.
+def _build_system_prompt(user: User) -> str:
+    """Build a system prompt personalized to the student's profile."""
+    base = """You are a helpful study assistant for engineering students. Use the provided context from course materials to answer questions accurately. Always cite which document your information comes from when possible.
 
 If the context doesn't cover the question, say so honestly rather than guessing. Be clear, concise, and educational in your responses."""
 
+    profile_parts = []
+    if user.class_name:
+        profile_parts.append(f"Class: {user.class_name}")
+    if user.semester:
+        profile_parts.append(f"Semester: {user.semester}")
+    if user.year:
+        profile_parts.append(f"Academic Year: {user.year}")
 
-def _retrieve_context(query: str, top_k: int = 3) -> list[dict]:
-    """Embed query and retrieve relevant chunks from Pinecone."""
+    if profile_parts:
+        base += f"\n\nThe student's profile: {', '.join(profile_parts)}. Tailor your answers to their level and curriculum when relevant."
+
+    return base
+
+
+def _build_pinecone_filter(user: User) -> dict | None:
+    """Build a Pinecone metadata filter based on the student's profile.
+    Returns None if no profile info is set (no filtering)."""
+    conditions = []
+    if user.class_name:
+        conditions.append({"class_name": {"$eq": user.class_name}})
+    if user.semester:
+        conditions.append({"semester": {"$eq": user.semester}})
+
+    if not conditions:
+        return None
+    if len(conditions) == 1:
+        return conditions[0]
+    return {"$and": conditions}
+
+
+def _retrieve_context(query: str, user: User, top_k: int = 5) -> list[dict]:
+    """Embed query and retrieve relevant chunks from Pinecone.
+    First tries filtered by student profile, falls back to unfiltered."""
     query_embedding = embed_query(query)
     index = _get_pinecone_index()
-    results = index.query(vector=query_embedding, top_k=top_k, include_metadata=True)
 
+    # Try filtered query first (matching student's class/semester)
+    pinecone_filter = _build_pinecone_filter(user)
+    if pinecone_filter:
+        results = index.query(
+            vector=query_embedding, top_k=top_k,
+            include_metadata=True, filter=pinecone_filter,
+        )
+        sources = _extract_sources(results)
+        if sources:
+            return sources
+
+    # Fallback: unfiltered query across all documents
+    results = index.query(vector=query_embedding, top_k=top_k, include_metadata=True)
+    return _extract_sources(results)
+
+
+def _extract_sources(results) -> list[dict]:
+    """Extract source info from Pinecone query results."""
     sources = []
     for match in results.matches:
         if match.score >= 0.3:
+            meta = match.metadata
+            label_parts = [meta.get("doc_title", "")]
+            if meta.get("subject"):
+                label_parts.insert(0, meta["subject"])
+            if meta.get("doc_type"):
+                label_parts.append(f"({meta['doc_type']})")
+
             sources.append({
-                "doc_id": match.metadata.get("doc_id", ""),
-                "doc_title": match.metadata.get("doc_title", ""),
-                "chunk_text": match.metadata.get("text", ""),
+                "doc_id": meta.get("doc_id", ""),
+                "doc_title": " — ".join(filter(None, label_parts)),
+                "chunk_text": meta.get("text", ""),
                 "score": round(match.score, 4),
             })
     return sources
 
 
 def _build_messages(chat: Chat, new_content: str, context_chunks: list[dict]) -> list[dict]:
-    """Build the message list for OpenAI API."""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    """Build the message list for OpenAI API (without system — added separately)."""
+    messages = []
 
     # Add last 10 messages from history
     for msg in chat.messages[-10:]:
@@ -73,24 +130,26 @@ def _build_messages(chat: Chat, new_content: str, context_chunks: list[dict]) ->
 
 
 async def stream_rag_response(
-    db: AsyncSession, chat: Chat, content: str
+    db: AsyncSession, chat: Chat, user: User, content: str
 ) -> AsyncGenerator[str, None]:
     """Run the RAG pipeline and stream the response."""
-    # 1. Retrieve context
-    sources = _retrieve_context(content)
+    # 1. Retrieve context (filtered by student profile when available)
+    sources = _retrieve_context(content, user)
 
     # 2. Save user message
     user_msg = Message(chat_id=chat.id, role="user", content=content)
     db.add(user_msg)
     await db.commit()
 
-    # 3. Build prompt and stream OpenAI response
-    messages = _build_messages(chat, content, sources)
+    # 3. Build prompt and stream response
+    system_prompt = _build_system_prompt(user)
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(_build_messages(chat, content, sources))
     client = _get_openai()
 
     full_response = ""
     stream = await client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-5.4-nano",
         messages=messages,  # type: ignore[arg-type]
         stream=True,
         max_tokens=4096,
@@ -122,7 +181,7 @@ async def generate_chat_title(content: str) -> str:
     """Generate a short title for a chat based on the first message."""
     client = _get_openai()
     response = await client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5.4-nano",
         max_tokens=20,
         messages=[
             {"role": "system", "content": "You generate short chat titles."},

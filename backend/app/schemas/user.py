@@ -10,6 +10,9 @@ class UserResponse(BaseModel):
     role: str
     auth_provider: str
     avatar_url: str | None
+    class_name: str | None
+    semester: str | None
+    year: str | None
     is_active: bool
     created_at: datetime
 
@@ -18,3 +21,10 @@ class UserResponse(BaseModel):
 
 class UserRoleUpdate(BaseModel):
     role: str  # "student" or "admin"
+
+
+class UserProfileUpdate(BaseModel):
+    full_name: str | None = None
+    class_name: str | None = None
+    semester: str | None = None
+    year: str | None = None
