@@ -25,12 +25,12 @@ def _build_metadata_prefix(document: Document) -> str:
     parts = []
     if document.subject:
         parts.append(f"Subject: {document.subject}")
-    if document.class_name:
-        parts.append(f"Class: {document.class_name}")
+    if document.discipline:
+        parts.append(f"Discipline: {document.discipline}")
+    if document.year_of_study:
+        parts.append(f"Year: {document.year_of_study}")
     if document.semester:
         parts.append(f"Semester: {document.semester}")
-    if document.academic_year:
-        parts.append(f"Year: {document.academic_year}")
     if document.doc_type:
         parts.append(f"Type: {document.doc_type}")
     parts.append(f"Document: {document.title}")
@@ -82,12 +82,12 @@ async def process_document(db: AsyncSession, document: Document, file_bytes: byt
             # Add structured metadata for Pinecone filtering
             if document.subject:
                 metadata["subject"] = document.subject
-            if document.class_name:
-                metadata["class_name"] = document.class_name
+            if document.discipline:
+                metadata["discipline"] = document.discipline
+            if document.year_of_study:
+                metadata["year_of_study"] = document.year_of_study
             if document.semester:
                 metadata["semester"] = document.semester
-            if document.academic_year:
-                metadata["academic_year"] = document.academic_year
             if document.doc_type:
                 metadata["doc_type"] = document.doc_type
 

@@ -29,32 +29,47 @@ def _get_openai():
     return _openai
 
 
-def _build_system_prompt(user: User) -> str:
-    """Build a system prompt personalized to the student's profile."""
-    base = """You are a helpful study assistant for engineering students. Use the provided context from course materials to answer questions accurately. Always cite which document your information comes from when possible.
+ENSIT_DISCIPLINES = [
+    "Génie Informatique",
+    "Génie Mécanique",
+    "Génie Électrique",
+    "Génie Civil",
+    "Mathématiques Appliquées et Modélisation",
+    "Génie Industriel",
+]
 
-If the context doesn't cover the question, say so honestly rather than guessing. Be clear, concise, and educational in your responses."""
+
+def _build_system_prompt(user: User) -> str:
+    """Build a system prompt personalized to the ENSIT student's profile."""
+    base = """You are a helpful study assistant for engineering students at ENSIT (École Nationale Supérieure d'Ingénieurs de Tunis). ENSIT is a Tunisian engineering school offering a 3-year "cycle ingénieur" across multiple disciplines: Génie Informatique, Génie Mécanique, Génie Électrique, Génie Civil, Mathématiques Appliquées et Modélisation, and Génie Industriel.
+
+Use the provided context from course materials to answer questions accurately. Always cite which document your information comes from when possible. If the context doesn't cover the question, say so honestly rather than guessing. Be clear, concise, and educational in your responses.
+
+You may answer in French or English depending on the language of the question and course materials."""
 
     profile_parts = []
-    if user.class_name:
-        profile_parts.append(f"Class: {user.class_name}")
+    if user.discipline:
+        profile_parts.append(f"Discipline: {user.discipline}")
+    if user.year_of_study:
+        year_labels = {1: "1ère année", 2: "2ème année", 3: "3ème année"}
+        profile_parts.append(f"Year: {year_labels.get(user.year_of_study, f'{user.year_of_study}ème année')}")
     if user.semester:
-        profile_parts.append(f"Semester: {user.semester}")
-    if user.year:
-        profile_parts.append(f"Academic Year: {user.year}")
+        profile_parts.append(f"Current semester: {user.semester}")
+    if user.class_group:
+        profile_parts.append(f"Class group: {user.class_group}")
 
     if profile_parts:
-        base += f"\n\nThe student's profile: {', '.join(profile_parts)}. Tailor your answers to their level and curriculum when relevant."
+        base += f"\n\nThis student's profile: {', '.join(profile_parts)}. Tailor your answers to their discipline, year level, and curriculum. For example, a 1st-year student needs more foundational explanations, while a 3rd-year student can handle advanced concepts. Focus on content relevant to their specific discipline when possible."
 
     return base
 
 
 def _build_pinecone_filter(user: User) -> dict | None:
     """Build a Pinecone metadata filter based on the student's profile.
-    Returns None if no profile info is set (no filtering)."""
+    Filters by discipline and semester for targeted retrieval."""
     conditions = []
-    if user.class_name:
-        conditions.append({"class_name": {"$eq": user.class_name}})
+    if user.discipline:
+        conditions.append({"discipline": {"$eq": user.discipline}})
     if user.semester:
         conditions.append({"semester": {"$eq": user.semester}})
 
@@ -71,7 +86,7 @@ def _retrieve_context(query: str, user: User, top_k: int = 5) -> list[dict]:
     query_embedding = embed_query(query)
     index = _get_pinecone_index()
 
-    # Try filtered query first (matching student's class/semester)
+    # Try filtered query first (matching student's discipline/semester)
     pinecone_filter = _build_pinecone_filter(user)
     if pinecone_filter:
         results = index.query(
@@ -152,7 +167,7 @@ async def stream_rag_response(
         model="gpt-5.4-nano",
         messages=messages,  # type: ignore[arg-type]
         stream=True,
-        max_tokens=4096,
+        max_completion_tokens=4096,
     )
     async for chunk in stream:
         delta = chunk.choices[0].delta.content
@@ -182,7 +197,7 @@ async def generate_chat_title(content: str) -> str:
     client = _get_openai()
     response = await client.chat.completions.create(
         model="gpt-5.4-nano",
-        max_tokens=20,
+        max_completion_tokens=20,
         messages=[
             {"role": "system", "content": "You generate short chat titles."},
             {"role": "user", "content": f"Summarize this question in 4-5 words as a chat title. Return ONLY the title, nothing else.\n\n{content}"},
