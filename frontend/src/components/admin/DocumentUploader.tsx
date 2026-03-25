@@ -6,7 +6,20 @@ import { Input } from "@/components/ui/input";
 import { useUploadDocument, type DocumentMeta } from "@/hooks/use-documents";
 
 const DOC_TYPES = ["cours", "td", "tp", "exam", "emploi", "other"];
-const SEMESTERS = ["S1", "S2", "S3", "S4", "S5", "S6"];
+const DISCIPLINES = [
+  "Génie Informatique",
+  "Génie Mécanique",
+  "Génie Électrique",
+  "Génie Civil",
+  "Mathématiques Appliquées et Modélisation",
+  "Génie Industriel",
+];
+const YEARS = [1, 2, 3];
+const YEAR_SEMESTERS: Record<number, string[]> = {
+  1: ["S1", "S2"],
+  2: ["S3", "S4"],
+  3: ["S5", "S6"],
+};
 
 export function DocumentUploader() {
   const upload = useUploadDocument();
@@ -24,6 +37,15 @@ export function DocumentUploader() {
     setFiles([]);
     setMeta({});
   };
+
+  const handleYearChange = (val: string) => {
+    const year = val ? parseInt(val) : undefined;
+    setMeta({ ...meta, year_of_study: year, semester: undefined });
+  };
+
+  const availableSemesters = meta.year_of_study
+    ? YEAR_SEMESTERS[meta.year_of_study] || []
+    : [];
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -85,13 +107,37 @@ export function DocumentUploader() {
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">
-            Class
+            Discipline
           </label>
-          <Input
-            placeholder="e.g. 1Génie Info A"
-            value={meta.class_name || ""}
-            onChange={(e) => setMeta({ ...meta, class_name: e.target.value })}
-          />
+          <select
+            value={meta.discipline || ""}
+            onChange={(e) => setMeta({ ...meta, discipline: e.target.value })}
+            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="">All disciplines</option>
+            {DISCIPLINES.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">
+            Year
+          </label>
+          <select
+            value={meta.year_of_study || ""}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="">All years</option>
+            {YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y === 1 ? "1ère année" : y === 2 ? "2ème année" : "3ème année"}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">
@@ -100,27 +146,18 @@ export function DocumentUploader() {
           <select
             value={meta.semester || ""}
             onChange={(e) => setMeta({ ...meta, semester: e.target.value })}
-            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            disabled={!meta.year_of_study}
+            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           >
-            <option value="">Select semester</option>
-            {SEMESTERS.map((s) => (
+            <option value="">
+              {meta.year_of_study ? "Select semester" : "Select year first"}
+            </option>
+            {availableSemesters.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
             ))}
           </select>
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
-            Academic Year
-          </label>
-          <Input
-            placeholder="e.g. 2023-2024"
-            value={meta.academic_year || ""}
-            onChange={(e) =>
-              setMeta({ ...meta, academic_year: e.target.value })
-            }
-          />
         </div>
         <div className="col-span-2 space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">

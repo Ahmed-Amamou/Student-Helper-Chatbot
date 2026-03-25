@@ -20,9 +20,12 @@ class User(Base):
     auth_provider: Mapped[str] = mapped_column(String(20), nullable=False, default="local")
     google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
-    class_name: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "1Génie Info A"
-    semester: Mapped[str | None] = mapped_column(String(20), nullable=True)  # e.g. "S2"
-    year: Mapped[str | None] = mapped_column(String(20), nullable=True)  # e.g. "2023-2024"
+    discipline: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "Génie Informatique"
+    year_of_study: Mapped[int | None] = mapped_column(nullable=True)  # 1, 2, or 3
+    semester: Mapped[str | None] = mapped_column(String(20), nullable=True)  # e.g. "S1"
+    class_group: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "A", "B"
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    verification_token: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(

@@ -5,9 +5,9 @@ from pydantic import BaseModel
 
 class DocumentUploadMeta(BaseModel):
     subject: str | None = None
-    class_name: str | None = None
+    discipline: str | None = None
+    year_of_study: int | None = None
     semester: str | None = None
-    academic_year: str | None = None
     doc_type: str | None = None  # cours, td, tp, exam, emploi
 
 
@@ -20,9 +20,9 @@ class DocumentResponse(BaseModel):
     chunk_count: int
     status: str
     subject: str | None
-    class_name: str | None
+    discipline: str | None
+    year_of_study: int | None
     semester: str | None
-    academic_year: str | None
     doc_type: str | None
     uploaded_by: str
     created_at: datetime

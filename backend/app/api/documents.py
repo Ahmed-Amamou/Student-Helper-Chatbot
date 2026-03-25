@@ -35,9 +35,9 @@ async def upload_document(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
     subject: str = Form(default=""),
-    class_name: str = Form(default=""),
+    discipline: str = Form(default=""),
+    year_of_study: int = Form(default=0),
     semester: str = Form(default=""),
-    academic_year: str = Form(default=""),
     doc_type: str = Form(default=""),
 ):
     if not file.filename:
@@ -57,9 +57,9 @@ async def upload_document(
         file_size=len(file_bytes),
         uploaded_by=admin.id,
         subject=subject or None,
-        class_name=class_name or None,
+        discipline=discipline or None,
+        year_of_study=year_of_study or None,
         semester=semester or None,
-        academic_year=academic_year or None,
         doc_type=doc_type or None,
     )
     db.add(doc)

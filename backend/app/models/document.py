@@ -19,9 +19,9 @@ class Document(Base):
     status: Mapped[str] = mapped_column(String(20), default="processing")
     # Structured metadata
     subject: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "Analyse Numérique"
-    class_name: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "1Génie Info A"
+    discipline: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "Génie Informatique"
+    year_of_study: Mapped[int | None] = mapped_column(nullable=True)  # 1, 2, or 3
     semester: Mapped[str | None] = mapped_column(String(20), nullable=True)  # e.g. "S2"
-    academic_year: Mapped[str | None] = mapped_column(String(20), nullable=True)  # e.g. "2023-2024"
     doc_type: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "cours", "td", "tp", "exam", "emploi"
     uploaded_by: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))

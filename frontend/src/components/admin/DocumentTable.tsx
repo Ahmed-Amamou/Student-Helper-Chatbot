@@ -36,7 +36,8 @@ export function DocumentTable() {
           <tr className="border-b border-border bg-muted/50">
             <th className="text-left px-4 py-3 font-medium">Document</th>
             <th className="text-left px-4 py-3 font-medium">Subject</th>
-            <th className="text-left px-4 py-3 font-medium">Class</th>
+            <th className="text-left px-4 py-3 font-medium">Discipline</th>
+            <th className="text-left px-4 py-3 font-medium">Year</th>
             <th className="text-left px-4 py-3 font-medium">Sem</th>
             <th className="text-left px-4 py-3 font-medium">Type</th>
             <th className="text-left px-4 py-3 font-medium">Chunks</th>
@@ -64,8 +65,11 @@ export function DocumentTable() {
               <td className="px-4 py-3 text-muted-foreground">
                 {doc.subject || "—"}
               </td>
+              <td className="px-4 py-3 text-muted-foreground text-xs">
+                {doc.discipline || "—"}
+              </td>
               <td className="px-4 py-3 text-muted-foreground">
-                {doc.class_name || "—"}
+                {doc.year_of_study ? `${doc.year_of_study}A` : "—"}
               </td>
               <td className="px-4 py-3 text-muted-foreground">
                 {doc.semester || "—"}

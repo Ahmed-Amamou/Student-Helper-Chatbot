@@ -8,9 +8,11 @@ export interface User {
   role: string;
   auth_provider: string;
   avatar_url: string | null;
-  class_name: string | null;
+  discipline: string | null;
+  year_of_study: number | null;
   semester: string | null;
-  year: string | null;
+  class_group: string | null;
+  is_verified: boolean;
 }
 
 interface AuthState {
@@ -18,9 +20,11 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string) => Promise<string>;
+  verifyEmail: (token: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<string>;
   googleAuth: (token: string) => Promise<void>;
-  updateProfile: (data: Partial<Pick<User, "full_name" | "class_name" | "semester" | "year">>) => Promise<void>;
+  updateProfile: (data: Partial<Pick<User, "full_name" | "discipline" | "year_of_study" | "semester" | "class_group">>) => Promise<void>;
   logout: () => void;
   fetchUser: () => Promise<void>;
 }
@@ -44,10 +48,21 @@ export const useAuthStore = create<AuthState>((set) => ({
       password,
       full_name: fullName,
     });
+    // No tokens — user must verify email first
+    return data.message;
+  },
+
+  verifyEmail: async (token) => {
+    const { data } = await api.post(`/auth/verify?token=${encodeURIComponent(token)}`);
     localStorage.setItem("access_token", data.access_token);
     localStorage.setItem("refresh_token", data.refresh_token);
     const { data: user } = await api.get("/auth/me");
     set({ user, isAuthenticated: true });
+  },
+
+  resendVerification: async (email) => {
+    const { data } = await api.post(`/auth/resend-verification?email=${encodeURIComponent(email)}`);
+    return data.message;
   },
 
   googleAuth: async (token) => {
