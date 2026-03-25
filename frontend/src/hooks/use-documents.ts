@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 
@@ -26,27 +27,31 @@ export interface Document {
   created_at: string;
 }
 
+// All possible processing statuses in order
+const ACTIVE_STATUSES = ["uploading", "parsing", "chunking", "embedding", "storing"];
+
 export function useDocuments() {
-  const query = useQuery<Document[]>({
+  return useQuery<Document[]>({
     queryKey: ["documents"],
     queryFn: async () => {
       const { data } = await api.get("/documents/");
       return data;
     },
-    // Poll every 2s while any document is still processing
     refetchInterval: (query) => {
       const docs = query.state.data;
-      if (docs?.some((d) => d.status === "processing")) return 2000;
+      if (docs?.some((d) => ACTIVE_STATUSES.includes(d.status))) return 1500;
       return false;
     },
   });
-  return query;
 }
 
 export function useUploadDocument() {
   const queryClient = useQueryClient();
-  return useMutation({
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
+  const mutation = useMutation({
     mutationFn: async ({ file, meta }: { file: File; meta: DocumentMeta }) => {
+      setUploadProgress(0);
       const formData = new FormData();
       formData.append("file", file);
       if (meta.subject) formData.append("subject", meta.subject);
@@ -56,11 +61,24 @@ export function useUploadDocument() {
       if (meta.doc_type) formData.append("doc_type", meta.doc_type);
       const { data } = await api.post("/documents/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (e) => {
+          if (e.total) {
+            setUploadProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        },
       });
       return data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
+    onSuccess: () => {
+      setUploadProgress(null);
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+    onError: () => {
+      setUploadProgress(null);
+    },
   });
+
+  return { ...mutation, uploadProgress };
 }
 
 export function useDeleteDocument() {

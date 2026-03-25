@@ -19,6 +19,12 @@ PARSERS = {
 }
 
 
+async def _set_status(db: AsyncSession, document: Document, status: str) -> None:
+    """Update document status and commit immediately so polling picks it up."""
+    document.status = status
+    await db.commit()
+
+
 def _build_metadata_prefix(document: Document) -> str:
     """Build a descriptive prefix from document metadata to prepend to each chunk.
     This ensures the embedding vector captures the document's context."""
@@ -41,26 +47,35 @@ async def process_document(db: AsyncSession, document: Document, file_bytes: byt
     """Parse, chunk, embed, and store document vectors in Pinecone."""
     try:
         # 1. Parse
+        await _set_status(db, document, "parsing")
         parser = PARSERS.get(document.file_type)
         if not parser:
-            document.status = "failed"
-            await db.commit()
+            await _set_status(db, document, "failed")
             return
 
         text = parser(file_bytes)
         if not text.strip():
-            document.status = "failed"
-            await db.commit()
+            await _set_status(db, document, "failed")
             return
 
         # 2. Chunk
+        await _set_status(db, document, "chunking")
         chunks = chunk_text(text)
+
+        # Update chunk count immediately so the UI shows it
+        document.chunk_count = len(chunks)
+        await db.commit()
+
+        # Brief pause so the polling UI catches the "chunking" step
+        import asyncio
+        await asyncio.sleep(1.5)
 
         # 3. Prepend metadata context to each chunk for richer embeddings
         metadata_prefix = _build_metadata_prefix(document)
         enriched_chunks = [f"{metadata_prefix}\n\n{chunk}" for chunk in chunks]
 
         # 4. Embed in batches of 128
+        await _set_status(db, document, "embedding")
         all_embeddings = []
         for i in range(0, len(enriched_chunks), 128):
             batch = enriched_chunks[i : i + 128]
@@ -68,6 +83,7 @@ async def process_document(db: AsyncSession, document: Document, file_bytes: byt
             all_embeddings.extend(embeddings)
 
         # 5. Upsert to Pinecone in batches of 100
+        await _set_status(db, document, "storing")
         pc = Pinecone(api_key=settings.PINECONE_API_KEY)
         index = pc.Index(settings.PINECONE_INDEX_NAME)
 
@@ -79,7 +95,6 @@ async def process_document(db: AsyncSession, document: Document, file_bytes: byt
                 "chunk_index": i,
                 "text": chunk[:1000],
             }
-            # Add structured metadata for Pinecone filtering
             if document.subject:
                 metadata["subject"] = document.subject
             if document.discipline:
@@ -101,17 +116,14 @@ async def process_document(db: AsyncSession, document: Document, file_bytes: byt
             batch = vectors[i : i + 100]
             index.upsert(vectors=batch)
 
-        # 6. Update document record
-        document.chunk_count = len(chunks)
-        document.status = "ready"
-        await db.commit()
+        # 6. Done
+        await _set_status(db, document, "ready")
 
     except Exception as e:
         import traceback
         print(f"[DOCUMENT] Processing failed for '{document.title}': {e}")
         traceback.print_exc()
-        document.status = "failed"
-        await db.commit()
+        await _set_status(db, document, "failed")
 
 
 async def delete_document_vectors(doc_id: str) -> None:

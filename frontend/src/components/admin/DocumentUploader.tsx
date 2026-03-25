@@ -22,7 +22,8 @@ const YEAR_SEMESTERS: Record<number, string[]> = {
 };
 
 export function DocumentUploader() {
-  const upload = useUploadDocument();
+  const { mutate, isPending, isSuccess, isError, uploadProgress } =
+    useUploadDocument();
   const [files, setFiles] = useState<File[]>([]);
   const [meta, setMeta] = useState<DocumentMeta>({});
 
@@ -32,7 +33,7 @@ export function DocumentUploader() {
 
   const handleUpload = () => {
     for (const file of files) {
-      upload.mutate({ file, meta });
+      mutate({ file, meta });
     }
     setFiles([]);
     setMeta({});
@@ -183,28 +184,43 @@ export function DocumentUploader() {
         </div>
       </div>
 
-      {/* Upload button */}
-      {files.length > 0 && (
-        <Button
-          onClick={handleUpload}
-          disabled={upload.isPending}
-          className="w-full gap-2"
-        >
-          {upload.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-          {upload.isPending
-            ? "Uploading..."
-            : `Upload ${files.length} file${files.length > 1 ? "s" : ""}`}
+      {/* Upload button + progress */}
+      {files.length > 0 && !isPending && (
+        <Button onClick={handleUpload} className="w-full">
+          Upload {files.length} file{files.length > 1 ? "s" : ""}
         </Button>
       )}
 
-      {/* Upload status */}
-      {upload.isSuccess && (
-        <div className="flex items-center gap-2 text-sm text-green-400 bg-green-500/10 rounded-md px-3 py-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          Uploaded! Processing in background...
+      {isPending && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              Uploading file...
+            </div>
+            {uploadProgress !== null && (
+              <span className="text-xs font-medium text-primary">
+                {uploadProgress}%
+              </span>
+            )}
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
+              style={{ width: `${uploadProgress ?? 0}%` }}
+            />
+          </div>
         </div>
       )}
-      {upload.isError && (
+
+      {/* Post-upload status */}
+      {isSuccess && (
+        <div className="flex items-center gap-2 text-sm text-green-400 bg-green-500/10 rounded-md px-3 py-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          File uploaded — processing steps visible in the table below.
+        </div>
+      )}
+      {isError && (
         <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
           <XCircle className="w-4 h-4 shrink-0" />
           Upload failed. Please try again.

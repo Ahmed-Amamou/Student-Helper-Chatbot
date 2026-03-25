@@ -3,6 +3,64 @@ import { Button } from "@/components/ui/button";
 import { useDocuments, useDeleteDocument } from "@/hooks/use-documents";
 import { formatDistanceToNow } from "date-fns";
 
+const PROCESSING_STEPS = ["parsing", "chunking", "embedding", "storing"];
+const STEP_LABELS: Record<string, string> = {
+  parsing: "Parsing file",
+  chunking: "Splitting into chunks",
+  embedding: "Generating embeddings",
+  storing: "Storing vectors",
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const isProcessing = PROCESSING_STEPS.includes(status);
+  const stepIndex = PROCESSING_STEPS.indexOf(status);
+
+  if (status === "ready") {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap bg-green-500/10 text-green-400">
+        ready
+      </span>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap bg-destructive/10 text-destructive">
+        failed
+      </span>
+    );
+  }
+
+  if (isProcessing) {
+    return (
+      <div className="space-y-1.5">
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap bg-yellow-500/10 text-yellow-400">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          {STEP_LABELS[status] || status}
+        </span>
+        <div className="flex gap-0.5">
+          {PROCESSING_STEPS.map((_, i) => (
+            <div
+              key={i}
+              className={`h-1 flex-1 rounded-full transition-colors ${
+                i <= stepIndex ? "bg-yellow-400" : "bg-muted"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback for "processing" (legacy) or unknown
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap bg-yellow-500/10 text-yellow-400">
+      <Loader2 className="w-3 h-3 animate-spin" />
+      {status}
+    </span>
+  );
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -87,20 +145,7 @@ export function DocumentTable() {
                 {doc.chunk_count}
               </td>
               <td className="px-3 py-2.5">
-                <span
-                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                    doc.status === "ready"
-                      ? "bg-green-500/10 text-green-400"
-                      : doc.status === "processing"
-                      ? "bg-yellow-500/10 text-yellow-400"
-                      : "bg-destructive/10 text-destructive"
-                  }`}
-                >
-                  {doc.status === "processing" && (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  )}
-                  {doc.status}
-                </span>
+                <StatusBadge status={doc.status} />
               </td>
               <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap text-xs">
                 {formatDistanceToNow(new Date(doc.created_at), {
