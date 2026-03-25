@@ -14,6 +14,16 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Email restriction
+    ALLOWED_EMAIL_DOMAIN: str = "ensit.u-tunis.tn"
+
+    # SMTP settings for verification emails
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_NAME: str = "Student Helper — ENSIT"
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

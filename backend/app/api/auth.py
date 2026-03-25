@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -13,9 +13,19 @@ from app.core.exceptions import CredentialsException
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=TokenResponse)
+@router.post("/register")
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     return await auth_service.register(db, req)
+
+
+@router.post("/verify", response_model=TokenResponse)
+async def verify_email(token: str = Query(...), db: AsyncSession = Depends(get_db)):
+    return await auth_service.verify_email(db, token)
+
+
+@router.post("/resend-verification")
+async def resend_verification(email: str = Query(...), db: AsyncSession = Depends(get_db)):
+    return await auth_service.resend_verification(db, email)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -53,12 +63,14 @@ async def update_profile(
 ):
     if req.full_name is not None:
         current_user.full_name = req.full_name
-    if req.class_name is not None:
-        current_user.class_name = req.class_name
+    if req.discipline is not None:
+        current_user.discipline = req.discipline
+    if req.year_of_study is not None:
+        current_user.year_of_study = req.year_of_study
     if req.semester is not None:
         current_user.semester = req.semester
-    if req.year is not None:
-        current_user.year = req.year
+    if req.class_group is not None:
+        current_user.class_group = req.class_group
     await db.commit()
     await db.refresh(current_user)
     return current_user

@@ -3,6 +3,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
+import { VerifyPage } from "@/pages/VerifyPage";
 import { ChatPage } from "@/pages/ChatPage";
 import { AdminPage } from "@/pages/AdminPage";
 import { ProfilePage } from "@/pages/ProfilePage";
@@ -36,6 +37,7 @@ export function AppRouter() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify" element={<VerifyPage />} />
         <Route
           element={
             <ProtectedRoute>

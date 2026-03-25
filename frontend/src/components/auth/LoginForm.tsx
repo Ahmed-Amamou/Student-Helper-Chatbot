@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
 import { GraduationCap } from "lucide-react";
+import axios from "axios";
 
 export function LoginForm() {
   const navigate = useNavigate();
@@ -20,8 +21,12 @@ export function LoginForm() {
     try {
       await login(email, password);
       navigate("/chat");
-    } catch {
-      setError("Invalid email or password");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data?.detail) {
+        setError(err.response.data.detail);
+      } else {
+        setError("Invalid email or password");
+      }
     } finally {
       setLoading(false);
     }
@@ -52,7 +57,7 @@ export function LoginForm() {
             <label className="text-sm font-medium">Email</label>
             <Input
               type="email"
-              placeholder="you@school.edu"
+              placeholder="name@ensit.u-tunis.tn"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
