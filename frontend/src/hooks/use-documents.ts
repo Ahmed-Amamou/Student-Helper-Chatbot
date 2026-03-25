@@ -27,13 +27,20 @@ export interface Document {
 }
 
 export function useDocuments() {
-  return useQuery<Document[]>({
+  const query = useQuery<Document[]>({
     queryKey: ["documents"],
     queryFn: async () => {
       const { data } = await api.get("/documents/");
       return data;
     },
+    // Poll every 2s while any document is still processing
+    refetchInterval: (query) => {
+      const docs = query.state.data;
+      if (docs?.some((d) => d.status === "processing")) return 2000;
+      return false;
+    },
   });
+  return query;
 }
 
 export function useUploadDocument() {

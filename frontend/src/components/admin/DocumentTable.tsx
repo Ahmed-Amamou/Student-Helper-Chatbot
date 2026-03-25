@@ -30,30 +30,30 @@ export function DocumentTable() {
   }
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="border border-border rounded-lg overflow-x-auto">
+      <table className="w-full text-sm min-w-[900px]">
         <thead>
           <tr className="border-b border-border bg-muted/50">
-            <th className="text-left px-4 py-3 font-medium">Document</th>
-            <th className="text-left px-4 py-3 font-medium">Subject</th>
-            <th className="text-left px-4 py-3 font-medium">Discipline</th>
-            <th className="text-left px-4 py-3 font-medium">Year</th>
-            <th className="text-left px-4 py-3 font-medium">Sem</th>
-            <th className="text-left px-4 py-3 font-medium">Type</th>
-            <th className="text-left px-4 py-3 font-medium">Chunks</th>
-            <th className="text-left px-4 py-3 font-medium">Status</th>
-            <th className="text-left px-4 py-3 font-medium">Uploaded</th>
-            <th className="px-4 py-3" />
+            <th className="text-left px-3 py-2.5 font-medium">Document</th>
+            <th className="text-left px-3 py-2.5 font-medium">Subject</th>
+            <th className="text-left px-3 py-2.5 font-medium">Discipline</th>
+            <th className="text-left px-3 py-2.5 font-medium w-12">Year</th>
+            <th className="text-left px-3 py-2.5 font-medium w-12">Sem</th>
+            <th className="text-left px-3 py-2.5 font-medium">Type</th>
+            <th className="text-left px-3 py-2.5 font-medium w-16">Chunks</th>
+            <th className="text-left px-3 py-2.5 font-medium">Status</th>
+            <th className="text-left px-3 py-2.5 font-medium">Uploaded</th>
+            <th className="px-3 py-2.5 w-10" />
           </tr>
         </thead>
         <tbody>
           {documents.map((doc) => (
             <tr key={doc.id} className="border-b border-border last:border-0">
-              <td className="px-4 py-3">
+              <td className="px-3 py-2.5">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <div>
-                    <span className="truncate block max-w-[180px]">
+                  <div className="min-w-0">
+                    <span className="truncate block max-w-[160px]" title={doc.title}>
                       {doc.title}
                     </span>
                     <span className="text-xs text-muted-foreground uppercase">
@@ -62,33 +62,33 @@ export function DocumentTable() {
                   </div>
                 </div>
               </td>
-              <td className="px-4 py-3 text-muted-foreground">
+              <td className="px-3 py-2.5 text-muted-foreground max-w-[120px] truncate" title={doc.subject || ""}>
                 {doc.subject || "—"}
               </td>
-              <td className="px-4 py-3 text-muted-foreground text-xs">
+              <td className="px-3 py-2.5 text-muted-foreground text-xs max-w-[100px] truncate" title={doc.discipline || ""}>
                 {doc.discipline || "—"}
               </td>
-              <td className="px-4 py-3 text-muted-foreground">
-                {doc.year_of_study ? `${doc.year_of_study}A` : "—"}
+              <td className="px-3 py-2.5 text-muted-foreground">
+                {doc.year_of_study || "—"}
               </td>
-              <td className="px-4 py-3 text-muted-foreground">
+              <td className="px-3 py-2.5 text-muted-foreground">
                 {doc.semester || "—"}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-3 py-2.5">
                 {doc.doc_type ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary capitalize">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary capitalize">
                     {doc.doc_type}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">—</span>
                 )}
               </td>
-              <td className="px-4 py-3 text-muted-foreground">
+              <td className="px-3 py-2.5 text-muted-foreground">
                 {doc.chunk_count}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-3 py-2.5">
                 <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
                     doc.status === "ready"
                       ? "bg-green-500/10 text-green-400"
                       : doc.status === "processing"
@@ -96,21 +96,24 @@ export function DocumentTable() {
                       : "bg-destructive/10 text-destructive"
                   }`}
                 >
+                  {doc.status === "processing" && (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  )}
                   {doc.status}
                 </span>
               </td>
-              <td className="px-4 py-3 text-muted-foreground">
+              <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap text-xs">
                 {formatDistanceToNow(new Date(doc.created_at), {
                   addSuffix: true,
                 })}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-3 py-2.5">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => deleteDoc.mutate(doc.id)}
                   disabled={deleteDoc.isPending}
-                  className="text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground hover:text-destructive h-7 w-7 p-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>

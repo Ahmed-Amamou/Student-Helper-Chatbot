@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload } from "lucide-react";
+import { Upload, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUploadDocument, type DocumentMeta } from "@/hooks/use-documents";
@@ -188,12 +188,27 @@ export function DocumentUploader() {
         <Button
           onClick={handleUpload}
           disabled={upload.isPending}
-          className="w-full"
+          className="w-full gap-2"
         >
+          {upload.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {upload.isPending
             ? "Uploading..."
             : `Upload ${files.length} file${files.length > 1 ? "s" : ""}`}
         </Button>
+      )}
+
+      {/* Upload status */}
+      {upload.isSuccess && (
+        <div className="flex items-center gap-2 text-sm text-green-400 bg-green-500/10 rounded-md px-3 py-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          Uploaded! Processing in background...
+        </div>
+      )}
+      {upload.isError && (
+        <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+          <XCircle className="w-4 h-4 shrink-0" />
+          Upload failed. Please try again.
+        </div>
       )}
     </div>
   );
