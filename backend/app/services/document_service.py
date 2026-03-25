@@ -106,7 +106,10 @@ async def process_document(db: AsyncSession, document: Document, file_bytes: byt
         document.status = "ready"
         await db.commit()
 
-    except Exception:
+    except Exception as e:
+        import traceback
+        print(f"[DOCUMENT] Processing failed for '{document.title}': {e}")
+        traceback.print_exc()
         document.status = "failed"
         await db.commit()
 
