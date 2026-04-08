@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -13,42 +13,67 @@ interface MessageBubbleProps {
   sources?: Source[] | null;
 }
 
-// ── Inline source badge (green star, hoverable) ────────────────────────
+// ── Strip [[src:...]] from content before rendering ─────────────────────
 
-function InlineSourceBadge({ title }: { title: string }) {
+function stripAndCollectSources(text: string): {
+  cleaned: string;
+  inlineSources: string[];
+} {
+  const inlineSources: string[] = [];
+  const cleaned = text.replace(/\[\[src:(.*?)\]\]/g, (_match, title) => {
+    const trimmed = title.trim();
+    if (!inlineSources.includes(trimmed)) {
+      inlineSources.push(trimmed);
+    }
+    // Replace with a numbered marker that we render as a dot
+    const idx = inlineSources.indexOf(trimmed) + 1;
+    return `{{cite:${idx}}}`;
+  });
+  return { cleaned, inlineSources };
+}
+
+// ── Tiny superscript dot that scrolls to sources ────────────────────────
+
+function CiteDot({
+  index,
+  onClickSources,
+}: {
+  index: number;
+  onClickSources: () => void;
+}) {
   return (
-    <span className="relative inline-flex group align-super ml-0.5">
-      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500/15 text-emerald-400 cursor-default text-[10px] leading-none">
-        ✦
-      </span>
-      {/* Tooltip */}
-      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 rounded-md bg-popover border border-border shadow-lg text-[11px] text-foreground whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
-        <FileText className="w-3 h-3 inline-block mr-1 text-emerald-400 -mt-0.5" />
-        {title}
-      </span>
-    </span>
+    <sup
+      onClick={onClickSources}
+      className="inline-flex items-center justify-center ml-0.5 w-[14px] h-[14px] rounded-full bg-emerald-500/20 text-emerald-400 text-[9px] font-bold cursor-pointer hover:bg-emerald-500/30 transition-colors select-none"
+      title="View source"
+    >
+      {index}
+    </sup>
   );
 }
 
-// ── Parse [[src:Title]] markers out of text ─────────────────────────────
+// ── Parse {{cite:N}} in rendered text nodes ─────────────────────────────
 
-const SRC_REGEX = /\[\[src:(.*?)\]\]/g;
+const CITE_REGEX = /\{\{cite:(\d+)\}\}/g;
 
-function stripSourceMarkers(text: string): string {
-  return text.replace(SRC_REGEX, "");
-}
-
-function renderWithInlineSources(text: string): ReactNode[] {
+function renderWithCites(
+  text: string,
+  onClickSources: () => void
+): ReactNode[] {
   const parts: ReactNode[] = [];
   let lastIndex = 0;
 
-  for (const match of text.matchAll(SRC_REGEX)) {
+  for (const match of text.matchAll(CITE_REGEX)) {
     const idx = match.index!;
     if (idx > lastIndex) {
       parts.push(text.slice(lastIndex, idx));
     }
     parts.push(
-      <InlineSourceBadge key={`src-${idx}`} title={match[1].trim()} />
+      <CiteDot
+        key={`cite-${idx}`}
+        index={parseInt(match[1])}
+        onClickSources={onClickSources}
+      />
     );
     lastIndex = idx + match[0].length;
   }
@@ -59,8 +84,8 @@ function renderWithInlineSources(text: string): ReactNode[] {
   return parts;
 }
 
-function hasSourceMarkers(text: string): boolean {
-  return SRC_REGEX.test(text);
+function hasCiteMarkers(text: string): boolean {
+  return text.includes("{{cite:");
 }
 
 // ── Code block with syntax highlighting ─────────────────────────────────
@@ -74,7 +99,6 @@ function CodeBlock({
   const match = /language-(\w+)/.exec(className || "");
   const code = String(children).replace(/\n$/, "");
 
-  // Inline code
   if (!match) {
     return (
       <code
@@ -114,7 +138,10 @@ function CodeBlock({
         </button>
       </div>
       <pre className="!m-0 !rounded-none !border-0 overflow-x-auto">
-        <code className={cn(className, "text-[13px] leading-relaxed")} {...props}>
+        <code
+          className={cn(className, "text-[13px] leading-relaxed")}
+          {...props}
+        >
           {children}
         </code>
       </pre>
@@ -122,55 +149,104 @@ function CodeBlock({
   );
 }
 
-// ── Text node that parses [[src:...]] inside rendered markdown ──────────
+// ── Text wrapper that replaces {{cite:N}} in children ───────────────────
 
-function TextWithSources({
+function TextWithCites({
   children,
-  ...props
-}: React.HTMLAttributes<HTMLSpanElement> & { children?: React.ReactNode }) {
-  if (typeof children === "string" && hasSourceMarkers(children)) {
-    return <span {...props}>{renderWithInlineSources(children)}</span>;
+  onClickSources,
+}: {
+  children?: React.ReactNode;
+  onClickSources: () => void;
+}) {
+  if (typeof children === "string" && hasCiteMarkers(children)) {
+    return <>{renderWithCites(children, onClickSources)}</>;
   }
 
-  // Handle arrays of children (mixed text + elements)
   if (Array.isArray(children)) {
     return (
-      <span {...props}>
+      <>
         {children.map((child, i) => {
-          if (typeof child === "string" && hasSourceMarkers(child)) {
-            return <span key={i}>{renderWithInlineSources(child)}</span>;
+          if (typeof child === "string" && hasCiteMarkers(child)) {
+            return (
+              <span key={i}>{renderWithCites(child, onClickSources)}</span>
+            );
           }
           return child;
         })}
-      </span>
+      </>
     );
   }
 
   return <>{children}</>;
 }
 
-// ── Sources summary badge (bottom of message) ──────────────────────────
+// ── Sources panel at bottom of message ──────────────────────────────────
 
-function SourcesSummary({ sources }: { sources: Source[] }) {
-  const [expanded, setExpanded] = useState(false);
+function SourcesPanel({
+  sources,
+  inlineSources,
+  expanded,
+  onToggle,
+  panelRef,
+}: {
+  sources: Source[];
+  inlineSources: string[];
+  expanded: boolean;
+  onToggle: () => void;
+  panelRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  // Merge: show inline-cited sources first (numbered), then any remaining from the API
+  const numberedTitles = inlineSources;
+  const extraSources = sources.filter(
+    (s) => !numberedTitles.some((t) => s.doc_title.includes(t) || t.includes(s.doc_title))
+  );
+
+  const totalCount = numberedTitles.length + extraSources.length;
+  if (totalCount === 0) return null;
 
   return (
-    <div className="mt-2">
+    <div ref={panelRef} className="mt-2.5 pt-2 border-t border-border/30">
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={onToggle}
         className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400/80 hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors"
       >
         <span className="text-[10px]">✦</span>
-        {sources.length} source{sources.length > 1 ? "s" : ""} used
+        {totalCount} source{totalCount > 1 ? "s" : ""}
       </button>
 
       {expanded && (
-        <div className="mt-2 ml-1 pl-3 border-l-2 border-emerald-500/20 space-y-2">
-          {sources.map((source, i) => (
-            <div key={i} className="flex items-start gap-1.5">
-              <FileText className="w-3 h-3 mt-0.5 shrink-0 text-emerald-400/60" />
-              <div>
-                <p className="text-[12px] font-medium text-foreground/80">
+        <div className="mt-2 space-y-1.5">
+          {numberedTitles.map((title, i) => {
+            const matchedSource = sources.find(
+              (s) => s.doc_title.includes(title) || title.includes(s.doc_title)
+            );
+            return (
+              <div key={`n-${i}`} className="flex items-start gap-2 text-[12px]">
+                <span className="inline-flex items-center justify-center shrink-0 w-[16px] h-[16px] rounded-full bg-emerald-500/20 text-emerald-400 text-[9px] font-bold mt-0.5">
+                  {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground/80 flex items-center gap-1">
+                    <FileText className="w-3 h-3 shrink-0 text-emerald-400/60" />
+                    {title}
+                  </p>
+                  {matchedSource && (
+                    <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
+                      {matchedSource.chunk_text}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {extraSources.map((source, i) => (
+            <div key={`e-${i}`} className="flex items-start gap-2 text-[12px]">
+              <span className="inline-flex items-center justify-center shrink-0 w-[16px] h-[16px] rounded-full bg-muted text-muted-foreground text-[9px] font-bold mt-0.5">
+                ·
+              </span>
+              <div className="min-w-0">
+                <p className="font-medium text-foreground/80 flex items-center gap-1">
+                  <FileText className="w-3 h-3 shrink-0 text-muted-foreground" />
                   {source.doc_title}
                 </p>
                 <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
@@ -189,10 +265,22 @@ function SourcesSummary({ sources }: { sources: Source[] }) {
 
 export function MessageBubble({ role, content, sources }: MessageBubbleProps) {
   const isUser = role === "user";
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
+  const sourcesPanelRef = useRef<HTMLDivElement>(null);
 
-  // Strip [[src:...]] from markdown so ReactMarkdown doesn't render raw markers,
-  // but we inject them back via the custom `p` component that processes text nodes.
-  const displayContent = content;
+  const { cleaned, inlineSources } = isUser
+    ? { cleaned: content, inlineSources: [] }
+    : stripAndCollectSources(content);
+
+  const scrollToSources = () => {
+    setSourcesExpanded(true);
+    setTimeout(() => {
+      sourcesPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 50);
+  };
+
+  const hasSources =
+    (sources && sources.length > 0) || inlineSources.length > 0;
 
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
@@ -215,22 +303,34 @@ export function MessageBubble({ role, content, sources }: MessageBubbleProps) {
                 code: CodeBlock as any,
                 p: ({ children, ...props }) => (
                   <p {...props}>
-                    <TextWithSources>{children}</TextWithSources>
+                    <TextWithCites onClickSources={scrollToSources}>
+                      {children}
+                    </TextWithCites>
                   </p>
                 ),
                 li: ({ children, ...props }) => (
                   <li {...props}>
-                    <TextWithSources>{children}</TextWithSources>
+                    <TextWithCites onClickSources={scrollToSources}>
+                      {children}
+                    </TextWithCites>
                   </li>
                 ),
               }}
             >
-              {displayContent}
+              {cleaned}
             </ReactMarkdown>
           </div>
         )}
 
-        {sources && sources.length > 0 && <SourcesSummary sources={sources} />}
+        {hasSources && (
+          <SourcesPanel
+            sources={sources || []}
+            inlineSources={inlineSources}
+            expanded={sourcesExpanded}
+            onToggle={() => setSourcesExpanded(!sourcesExpanded)}
+            panelRef={sourcesPanelRef}
+          />
+        )}
       </div>
     </div>
   );
